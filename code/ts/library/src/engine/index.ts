@@ -18,4 +18,6 @@ ds.load(
     Star,
 );
 
+window.Datastar = ds
+
 export const Datastar = ds;

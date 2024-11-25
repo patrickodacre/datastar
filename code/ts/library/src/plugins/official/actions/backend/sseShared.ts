@@ -1,5 +1,7 @@
 import { ActionMethod } from "../../../../engine";
 import { DATASTAR } from "../../../../engine/consts";
+const DATASTAR_REQUEST = 'datastar-request';
+const CONTENT_TYPE = 'Content-Type';
 import { ERR_BAD_ARGS } from "../../../../engine/errors";
 import { remoteSignals } from "../../../../utils/signals";
 import {
@@ -40,18 +42,45 @@ export function sendSSERequest(
     ) => {
         if (!!!url?.length) throw ERR_BAD_ARGS;
 
-        const { onlyRemoteSignals, headers } = Object.assign({
-            onlyRemoteSignals: true,
-            headers: {
-                CONTENT_TYPE: "application/json",
-                DATASTAR_REQUEST: "true",
-            },
-        }, args);
+        // config
+        let onlyRemoteSignals = true
+        if (args && 'onlyRemoteSignals' in args) {
+            if (Object.prototype.toString.call(args.onlyRemoteSignals) === '[object Boolean]') {
+              onlyRemoteSignals = args.onlyRemoteSignals
+            } else if (args.onlyRemoteSignals === 'true' || args.onlyRemoteSignals === 'false') {
+              onlyRemoteSignals = args.onlyRemoteSignals === 'true'
+            } else {
+              console.error("Unexpected value for onlyRemoteSignals. Must be a boolean.")
+            }
+        }
+
+        let headers = {
+            [CONTENT_TYPE]: "application/json",
+            [DATASTAR_REQUEST]: "true"
+        }
+        if (args && 'headers' in args) {
+            headers = {...headers, ...args.headers || {}}
+        }
+
+        // end config
+
         const currentStore = ctx.store().value;
         let store = Object.assign({}, currentStore);
+
         if (onlyRemoteSignals) {
             store = remoteSignals(store);
         }
+
+        // data-headers plugin
+        if (ctx.store()._dsPlugins && ctx.store()._dsPlugins.fetch) {
+            const fetchHeaders = ctx.store()._dsPlugins.fetch.headers || {}
+
+            for (const [key, value] of Object.entries(fetchHeaders)) {
+              if (key.startsWith('_')) continue
+              headers[key] = `${value}`
+            }
+        }
+
         const storeJSON = JSON.stringify(store);
 
         const { el: { id: elID } } = ctx;
